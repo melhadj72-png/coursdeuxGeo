@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Cairo:wght@900&display=swap" rel="stylesheet">
+<title>Cours 3D · المناخ والنبات والمياه في موريتانيا</title>
+<style>
+:root{--nuit:#0c1a2b;--nuit2:#14283f;--sable:#e9c27a;--ocre:#d98e3f;--eau:#4cc3d9;--texte:#f3ecdd}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--nuit);color:var(--texte);font-family:"Segoe UI",Tahoma,Arial,sans-serif}
+header{padding:10px 16px;display:flex;flex-wrap:wrap;gap:8px 20px;align-items:center;justify-content:space-between;background:var(--nuit2)}
+h1{margin:0;font-size:1.25rem;color:var(--sable)}
+#parts{display:flex;flex-wrap:wrap;gap:6px}
+#parts button{font-size:.8rem}
+#parts button.on{background:var(--ocre);color:#1a1206}
+button,.big,.small{background:#233d5a;color:var(--texte);border:1px solid #3b5b7e;border-radius:8px;padding:8px 12px;font:inherit;cursor:pointer}
+button:hover,.big:hover,.small:hover{background:#2d4d72}
+button:focus-visible,.big:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--eau);outline-offset:2px}
+.big{display:inline-block;background:var(--ocre);color:#1a1206;font-weight:700;font-size:1.05rem;padding:12px 20px;border-color:var(--ocre)}
+.small{display:inline-block}
+#stage{position:relative;width:100%;height:min(82vh,62vw);display:flex;flex-direction:column;background:#08111c;overflow:hidden}
+#view{flex:1;min-height:0;position:relative}
+#stage:fullscreen{height:100%}
+#c{position:absolute;inset:0;width:100%;height:100%;display:block}
+#sub{flex:none;min-height:4.4em;display:flex;align-items:center;justify-content:center;padding:6px 4% 10px;background:#08111c;text-align:center;pointer-events:none;font-family:'Cairo','Tajawal',Tahoma,sans-serif;font-weight:900;font-size:clamp(1.25rem,4.2vw,2.4rem);line-height:1.5}
+#sub .ln{display:inline-block;animation:pop .22s ease-out}
+#sub .w{display:inline-block;margin:0 .14em;color:#fff;paint-order:stroke fill;-webkit-text-stroke:.2em #000;text-shadow:0 .08em .12em rgba(0,0,0,.7);transition:transform .12s,color .12s}
+#sub .w.on{color:#ffe14a;transform:scale(1.14)}
+@keyframes pop{from{transform:scale(.88);opacity:0}to{transform:scale(1);opacity:1}}
+#msg{position:absolute;top:8px;right:10px;font-size:.8rem;color:#bcd}
+#ctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 16px;background:var(--nuit2)}
+#bPlay{min-width:56px;font-size:1.1rem;background:var(--eau);color:#06222a}
+#bar{flex:1 1 220px;accent-color:var(--ocre)}
+#time{font-variant-numeric:tabular-nums;min-width:96px}
+select{background:#233d5a;color:var(--texte);border:1px solid #3b5b7e;border-radius:8px;padding:8px}
+#store{padding:12px 16px;display:grid;gap:10px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.state{font-size:.9rem;color:#cfe}
+.note{margin:0;font-size:.85rem;color:#9fb4c9;max-width:80ch}
+@media(max-width:600px){#stage{height:112vw}}
+
+#sub.off{display:none}
+</style>
+</head>
+<body>
+<header>
+  <h1 dir="rtl" lang="ar">المناخ والنبات والمياه في موريتانيا</h1>
+  <nav id="parts" aria-label="Parties du cours"></nav>
+</header>
+
+<main id="stage">
+  <div id="view"><canvas id="c"></canvas></div>
+  <div id="sub" dir="rtl" lang="ar"></div>
+  <div id="msg"></div>
+</main>
+
+<section id="ctl" aria-label="Lecteur">
+  <button id="bPrev" title="Scène précédente">⏮</button>
+  <button id="bBack" title="Reculer de 5 s">−5 s</button>
+  <button id="bPlay" title="Lecture / pause">▶</button>
+  <button id="bFwd" title="Avancer de 5 s">+5 s</button>
+  <button id="bNext" title="Scène suivante">⏭</button>
+  <button id="bRestart" title="Début de la scène">↺ Début de scène</button>
+  <input id="bar" type="range" min="0" max="1000" value="0" aria-label="Progression">
+  <span id="time">0:00 / 0:00</span>
+  <select id="rate" aria-label="Vitesse">
+    <option value="0.75">0,75×</option><option value="1" selected>1×</option>
+    <option value="1.25">1,25×</option><option value="1.5">1,5×</option>
+  </select>
+  <button id="bSub" title="Afficher / masquer les sous-titres">Sous-titres : oui</button>
+  <button id="bFull" title="Plein écran">⛶</button>
+</section>
+
+<section id="store">
+  <div class="row">
+    <label class="big" for="fAudio">Importer mon fichier audio</label>
+    <input id="fAudio" type="file" accept="audio/*,.mp3,.wav,.m4a,.ogg" hidden>
+    <button id="bDelAudio">Supprimer l’audio enregistré</button>
+    <span id="audioState" class="state">Aucun audio : mode manuel (les scènes avancent avec l’horloge de la page).</span>
+  </div>
+  <div class="row">
+    <label class="small" for="fSrt">Remplacer le SRT (facultatif)</label>
+    <input id="fSrt" type="file" accept=".srt,text/plain" hidden>
+    <span id="srtState" class="state">SRT : chargement…</span>
+  </div>
+  <p class="note">L’audio et le SRT restent dans ce navigateur, sur cet appareil (IndexedDB) ; rien n’est envoyé sur Internet. Ils disparaissent si vous effacez les données du site ou du navigateur : la conservation n’est pas garantie dans ce cas.</p>
+</section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const EMBEDDED_SRT="1\n00:00:00,288 --> 00:00:06,528\nالسلام عليكم يا أحباء التلاميذ مرحبا\nبكم في درس جديد من دروس الجغرافية\n\n2\n00:00:07,008 --> 00:00:12,048\nعنوان درسنا اليوم المناخ\nوالنبات والمياه في موريتانيا\n\n3\n00:00:12,864 --> 00:00:19,784\nسنأخذ الدرس خطوة خطواة، وسنعيد الأفكار\nالمهمة أكثر من مرة حتى تبقى في ذاكرتكم.\n\n4\n00:00:20,304 --> 00:00:21,104\nفركزوا معي.\n\n5\n00:00:22,464 --> 00:00:24,364\nأولا أهداف الدرس\n\n6\n00:00:25,248 --> 00:00:29,528\nفي نهاية هذا الدرس ستكونون\nقادرين على أربعة أشياء\n\n7\n00:00:29,528 --> 00:00:29,664\nالأول\n\n8\n00:00:30,048 --> 00:00:34,808\nأن تتعرفوا على الخصائص\nالمناخية العامة لموريتانيا\n\n9\n00:00:35,616 --> 00:00:36,096\nتاني\n\n10\n00:00:36,576 --> 00:00:40,836\nأن توطن الأقاليم المناخية\nعلى الخريطة الثالث\n\n11\n00:00:40,836 --> 00:00:45,312\nأن تتعرف على أثر المنخ\nعلى النباتي وعلى المياه\n\n12\n00:00:45,888 --> 00:00:51,308\nوالرابع أن تتعرف على المصادر\nالمائية الموريتانية وعلى مشاكلها\n\n13\n00:00:52,320 --> 00:00:52,900\nهيا نبدأ\n\n14\n00:00:54,048 --> 00:00:57,248\nالقسم الأول، العوامل المؤثرة في المناخ\n\n15\n00:00:58,368 --> 00:01:02,188\nفي النشاط الأول نتأمل الخطاطة ثم نستنتج\n\n16\n00:01:02,880 --> 00:01:07,000\nوالخطاطة تبين العوامل\nالمؤثرة في المناخ الموريتاني\n\n17\n00:01:07,000 --> 00:01:13,540\nمن خلال الدعامات نلاحظ أن المنخ\nالموريثاني يتأثر بعواملة عديدة\n\n18\n00:01:13,540 --> 00:01:16,800\nوسنحفظها في ثلاثة عواميل رئيسية\n\n19\n00:01:17,568 --> 00:01:18,912\nالموقع الفلكي ومراكز\n\n20\n00:01:19,296 --> 00:01:21,216\nالضغط والرياح والغطاء\n\n21\n00:01:21,600 --> 00:01:22,748\nالنباتي\n\n22\n00:01:23,808 --> 00:01:24,864\nالعامل الأول\n\n23\n00:01:25,248 --> 00:01:26,568\nالموقع الفلكي\n\n24\n00:01:27,648 --> 00:01:30,816\nتقع موريتانيا فلكيا بين دائرتين\n\n25\n00:01:31,200 --> 00:01:35,608\nعرض 15 و 27 درجة شمال خط الاستواء\n\n26\n00:01:36,192 --> 00:01:39,552\nويمر مدار السرطان من أجزائها الشمالية\n\n27\n00:01:40,224 --> 00:01:46,304\nوهذا الموقع يجعل موريتانيا في\nمعظمها داخل المنطقة البي مدارية\n\n28\n00:01:46,304 --> 00:01:49,744\nأي المنضقة التي تقع بين المدارين\n\n29\n00:01:49,744 --> 00:01:49,920\nوهي\n\n30\n00:01:50,304 --> 00:01:53,944\nمنطقة تتميز بارتفاع درجات الحرارة\n\n31\n00:01:53,944 --> 00:01:57,364\nوهذا هو سبب حرارات المناخ الموريتني\n\n32\n00:01:57,984 --> 00:01:59,424\nإذن نتذكر الموقع\n\n33\n00:01:59,808 --> 00:02:02,684\nالفلكي يفسر الحرارة\n\n34\n00:02:03,360 --> 00:02:04,416\nالعامل الثاني\n\n35\n00:02:05,088 --> 00:02:07,968\nتأثير مراكز الضغط وأنواع الرياح\n\n36\n00:02:08,928 --> 00:02:12,968\nيتأثر المناخ الموريتاني بمراكز ضغط مرتفعة\n\n37\n00:02:12,968 --> 00:02:18,068\nينتج عنها أنواع مختلفة من\nالرياح وهي ثلاثة مراكس\n\n38\n00:02:18,912 --> 00:02:22,560\nالمركز الأول مركز الضغط\nالمرتفع الصحراوي يقع\n\n39\n00:02:22,944 --> 00:02:24,864\nداخل الصحراء الكبرى\n\n40\n00:02:25,344 --> 00:02:30,044\nوتهب منه رياح تجارية\nشمالية شرقية حارة وجافة\n\n41\n00:02:30,816 --> 00:02:33,916\nالمركز الثاني مركز الدغط المرتفع الأسوري\n\n42\n00:02:33,916 --> 00:02:34,176\nيقع\n\n43\n00:02:34,560 --> 00:02:39,196\nحول جزر الأسري البرتغالية\nفي شمال غرب المحيط الأطلسي\n\n44\n00:02:39,196 --> 00:02:39,456\nومنه\n\n45\n00:02:39,840 --> 00:02:47,136\nتهب رياح تجارية بحرية تساهم في اعتدال\nمتوسطات الحرارة في المناطق الشاطئية\n\n46\n00:02:47,712 --> 00:02:51,452\nلكن مفعولها في مجال\nالمطر يكاد يكون معدوماً\n\n47\n00:02:51,936 --> 00:02:55,196\nأي أنها تلطف الحرارة ولا تسقط المطر\n\n48\n00:02:56,064 --> 00:02:59,040\nالمركز الثالث مركز ضغط سانت هيلانا\n\n49\n00:02:59,520 --> 00:03:02,240\nومنه تهب رياح موسمية أطصية\n\n50\n00:03:02,240 --> 00:03:02,400\nتتسبب\n\n51\n00:03:02,784 --> 00:03:06,816\nفي حدوث تساقطات مطرية هامة على البلاد\n\n52\n00:03:07,392 --> 00:03:10,352\nإذن هذه هي الرياح التي تجلب المطر\n\n53\n00:03:11,328 --> 00:03:12,384\nلنعد ببساطة\n\n54\n00:03:12,768 --> 00:03:15,488\nالصحراوي رياحه حارة وجافة\n\n55\n00:03:15,488 --> 00:03:15,552\nوالآسوري\n\n56\n00:03:15,936 --> 00:03:19,868\nرياحته تعتدل بها الحرارة على الشواطئ\n\n57\n00:03:20,544 --> 00:03:23,264\nوسانت هيلانا رياحه تجلب المطر\n\n58\n00:03:24,288 --> 00:03:26,784\nالعامل الثالث الغطاء النباتي تلعب\n\n59\n00:03:27,168 --> 00:03:30,328\nالغابات الكثيفة والأراضي المعشوشبة\n\n60\n00:03:30,328 --> 00:03:35,904\nدورا هاما في التأثير على درجات\nالحرارة وعلى معدلات الرطوبة\n\n61\n00:03:36,480 --> 00:03:40,940\nويظهر تأثير هذا العامل في\nموريتانيا في أقصى جنوب البلد\n\n62\n00:03:41,952 --> 00:03:42,912\nنستنتجو إذن\n\n63\n00:03:43,488 --> 00:03:46,888\nأن المناخ الموريتاني يتأثر بعوامل عديدة\n\n64\n00:03:46,888 --> 00:03:53,088\nمنها الموقع الفلكي ومراكز الضغط\nوأنواع الرياح والغطاء النباتي\n\n65\n00:03:54,144 --> 00:03:56,160\nننتقد الآن إلى القسم الثاني\n\n66\n00:03:56,832 --> 00:04:01,352\nالقسم الثاني الأقاليم المناخية\nوالنباتية في موريتانيا\n\n67\n00:04:02,592 --> 00:04:09,212\nفي النشاط الثاني نتأمل الخريطة الأولى\nوهي خريطه الأقاليم المناخية في موريتانيا\n\n68\n00:04:09,212 --> 00:04:13,312\nوالخريطته الثالية وهي\nالخرييطه الغطاء النباتي\n\n69\n00:04:13,312 --> 00:04:13,536\nثم\n\n70\n00:04:13,920 --> 00:04:17,172\nنتامل صورا للغطاء نباتى في موريتانيا\n\n71\n00:04:17,172 --> 00:04:20,928\nوصورا لنباتات في المنطقة الصحراوية\n\n72\n00:04:21,696 --> 00:04:22,456\nثم نستنتج.\n\n73\n00:04:23,520 --> 00:04:29,840\nمن خلال الدعامات نلاحظ أن هناك ارتباطاً\nوثيقاً بين المناخ والنبات في موريتانيا\n\n74\n00:04:30,720 --> 00:04:35,080\nويمكن تقسيم المناخ في\nميريتانيا إلى إقليمين رئيسيين\n\n75\n00:04:35,808 --> 00:04:42,528\nويمتاز كل إقليم بخصائص مناخية\nونباتية وحيوانية تميزه عن غيره\n\n76\n00:04:43,488 --> 00:04:44,408\nالإقليم الأول\n\n77\n00:04:45,120 --> 00:04:46,220\nالإقليم الساحلي\n\n78\n00:04:47,808 --> 00:04:53,468\nتمتد حدوده الجغرافية شمالا\nإلى خط نواكشوت تجكجة النعمة.\n\n79\n00:04:54,240 --> 00:05:02,140\nوتتراوح متوسطات أنطاره ما بين\n140 مم في نوكشوت و300 مم فروسو\n\n80\n00:05:02,784 --> 00:05:05,164\nوتسوده نباتات السباسب\n\n81\n00:05:06,144 --> 00:05:07,008\nنتذكر الساحلي\n\n82\n00:05:07,392 --> 00:05:14,304\nأمطاره من 140 إلى 300\nمليمتر ونباته السباسب\n\n83\n00:05:15,648 --> 00:05:17,988\nالإقليم الثاني الإقлиم الصحراوي\n\n84\n00:05:18,720 --> 00:05:21,312\nوهو يغطي ثلثي مساحة البلاد\n\n85\n00:05:21,984 --> 00:05:23,904\nأي أكثر من نصف موريتانيا\n\n86\n00:05:24,576 --> 00:05:26,696\nويتميز بارتفاع درجات الحرارة\n\n87\n00:05:27,456 --> 00:05:31,872\nوأمطاره قليلة 125 مم في السنة\n\n88\n00:05:32,352 --> 00:05:35,772\nوهي أيضا متذبذبة أي غير منتظمة\n\n89\n00:05:36,960 --> 00:05:40,320\nوالمدى الحراري كبير خاصة بين النهار والليل\n\n90\n00:05:40,320 --> 00:05:46,080\nوالمدة الحرري هو الفرق بين أعلى\nدرجة حرارة وأدنى درجה حرara\n\n91\n00:05:46,656 --> 00:05:49,956\nأي أن النهار شديد الحرارة والليل بارد\n\n92\n00:05:51,552 --> 00:05:55,584\nوتتسبب الأمطار القليلة\nفي نمو أعشاب صيفية لا\n\n93\n00:05:55,968 --> 00:05:58,272\nتدوم أكثر من عدة أسابيع\n\n94\n00:05:59,136 --> 00:06:03,356\nوقد يلاحظ أحيانا وجود شجيرات صغيرة وشائكة\n\n95\n00:06:04,992 --> 00:06:06,720\nوهناك حالة خاصة\n\n96\n00:06:07,488 --> 00:06:08,788\nالمناطق الشاطئية\n\n97\n00:06:09,792 --> 00:06:11,952\nتتميز بخصوصيتها المناخية\n\n98\n00:06:12,864 --> 00:06:17,704\nفهي على العموم معتدلة الحرارة\nمقارنة بالمناطق الداخلية\n\n99\n00:06:18,624 --> 00:06:21,120\nلكنها تأخذ طابعاً صحراوياً\n\n100\n00:06:21,696 --> 00:06:26,136\nفيما يتعلق بكمية الأمطار\nالمحدودة ونماتاتها القليلة\n\n101\n00:06:26,784 --> 00:06:29,424\nالتي هي في الغالب نباتات ملحية\n\n102\n00:06:31,104 --> 00:06:34,844\nوالآن قاعدة مهمة جدا ركزوا عليها\n\n103\n00:06:36,000 --> 00:06:40,320\nيرتبط الغطاء النباتي ارتباطاً\nوثيقاً بكمية الأمطار.\n\n104\n00:06:41,088 --> 00:06:46,108\nفكلما كانت كميات الأمطار معتابرة\nزادت كثافة الغطاء النباتي\n\n105\n00:06:47,040 --> 00:06:50,880\nوإذا تناقصت كمية الأمطار\nضعف الغطاء النباتي\n\n106\n00:06:51,840 --> 00:06:52,320\nأعيدها\n\n107\n00:06:52,992 --> 00:06:55,412\nمطر كثير نبات كثيف\n\n108\n00:06:56,064 --> 00:06:58,484\nمطر قليل نبات ضعيف\n\n109\n00:06:59,328 --> 00:07:04,048\nنستنتج أن المناخ الموريتاني\nمتنوع بسبب العوامل المؤثرة فيه\n\n110\n00:07:04,048 --> 00:07:06,988\nويمكن تقسيمه إلى إقليمين رئيسيين\n\n111\n00:07:06,988 --> 00:07:12,168\nهما المنخ الساحلي والمنخ الصحراوي\nرغم خصوصية المناطق الشاطئية\n\n112\n00:07:13,152 --> 00:07:15,792\nالقسم الثالث المياه في موريتانيا\n\n113\n00:07:16,608 --> 00:07:19,488\nفي النشاط الثالث نتأمل الصور ثم نستنتج\n\n114\n00:07:20,160 --> 00:07:26,980\nوهي صور خزان مائي ونهر السنجال ومياه\nالأمطار والضغط على الموارد المائية\n\n115\n00:07:27,840 --> 00:07:31,680\nمن خلال الدعمات نلاحظ أن\nالمياه تنقسم إلى قسمين\n\n116\n00:07:32,256 --> 00:07:34,752\nمياه صدحية ومياه جوفية\n\n117\n00:07:35,424 --> 00:07:37,344\nأولا المياه السطحية وهي\n\n118\n00:07:37,728 --> 00:07:39,444\nتشمل ثلاثة أنواع\n\n119\n00:07:39,444 --> 00:07:43,104\nمياه الأمطار ومياه النهر ومياه المحيط\n\n120\n00:07:43,776 --> 00:07:45,600\nالنوع الأول مياه الأنطار\n\n121\n00:07:46,368 --> 00:07:51,448\nتعد مياه الأمطار هي المسؤولة عن موجود\nالأودية الموسمية مثل أودية أدرار\n\n122\n00:07:51,448 --> 00:07:54,144\nوعن موجوج البراك والمستنقعات وعon\n\n123\n00:07:54,528 --> 00:07:57,024\nتغذية النهر وروافده بالمياه\n\n124\n00:07:57,696 --> 00:08:03,116\nوأحيانا عن تغذية بعض الطبقات\nالجوفية القريبة من سطح الأرض\n\n125\n00:08:04,416 --> 00:08:06,816\nالنوع الثاني مياه النهر\n\n126\n00:08:07,776 --> 00:08:13,536\nيعد نهر السنغال المجرى المائي\nالوحيد دائم الجريان في موريتانيا\n\n127\n00:08:14,400 --> 00:08:17,400\nينبع من مرتفعات فوتا جالون في غينية\n\n128\n00:08:18,240 --> 00:08:22,368\nويقطع مسافة 1750 كم\n\n129\n00:08:22,944 --> 00:08:26,424\nمنها 500 كيلو متر في الأراضي الموريتانية\n\n130\n00:08:27,840 --> 00:08:30,240\nويغذي بعض البحيرات الموسمية\n\n131\n00:08:30,624 --> 00:08:33,160\nالتي من أهمها بحيرة أركيز\n\n132\n00:08:34,176 --> 00:08:38,896\nوفي الوقت نفسه يتزود هذا النهر\nبالمياه القادمة عبر الأودية\n\n133\n00:08:39,840 --> 00:08:42,240\nومن أهم تلك الأودية في موريتانيا\n\n134\n00:08:42,624 --> 00:08:44,360\nكوركول وكاراكورو\n\n135\n00:08:45,312 --> 00:08:46,652\nنتذكر الأرقام\n\n136\n00:08:47,136 --> 00:08:51,456\n1750 كم هو طول النهر كله\n\n137\n00:08:52,128 --> 00:08:55,508\nو 500 كيلو متر فقط داخل موريتانيا\n\n138\n00:08:56,640 --> 00:08:58,880\nالنوع الثالث مياه المحيط\n\n139\n00:09:00,000 --> 00:09:05,600\nرغم ملوحة مياه المحيط ينظر\nإليها في المستقبل كمصدر مائي هام\n\n140\n00:09:05,600 --> 00:09:07,480\nلو أمكن تحليتها\n\n141\n00:09:08,736 --> 00:09:09,408\nثانيا\n\n142\n00:09:09,888 --> 00:09:10,908\nالمياه الجوفية\n\n143\n00:09:11,616 --> 00:09:16,512\nوهي مياه تتواجد في باطن\nالأرض على شكل خزانات كبرى\n\n144\n00:09:17,088 --> 00:09:18,548\nومنها ثلاثة خزانات\n\n145\n00:09:19,488 --> 00:09:23,428\nالخزان الغربي ويسمى خزانة رارزا\n\n146\n00:09:24,096 --> 00:09:28,128\nويشغل منطقة الحوض الرسوبي\nالسنجالي الموريتاني\n\n147\n00:09:28,608 --> 00:09:32,388\nفي منطقة بنشاب وبلونوار وإديني\n\n148\n00:09:33,120 --> 00:09:36,960\nالثاني خزان تودني وهو بحيرة أظهر\n\n149\n00:09:37,728 --> 00:09:39,936\nالثالث الخزان الفيغي ويوجد\n\n150\n00:09:40,320 --> 00:09:42,528\nبمحاذاة نهر السينيغال\n\n151\n00:09:43,200 --> 00:09:45,696\nوالآن نصل إلى مشاكل المياه\n\n152\n00:09:46,176 --> 00:09:49,248\nتعاني المياه في موريتانيا من مشاكل كثيرة\n\n153\n00:09:49,824 --> 00:09:51,360\nهمها ستة مشاكل\n\n154\n00:09:52,128 --> 00:09:57,028\nالجفاف الذي أدى إلى قلة التساقطات المطرية\n\n155\n00:09:57,792 --> 00:10:01,692\nالثانية التلوث الذي يواجه نهر السينيغال\n\n156\n00:10:02,496 --> 00:10:07,584\nالثالثة تزايد الطلب على الماء\nفي الوسط الحضري أي في المدن\n\n157\n00:10:08,256 --> 00:10:11,036\nالرابعة قلة الأطر المتخصصة\n\n158\n00:10:11,808 --> 00:10:14,208\nالخامسة نقص رؤوس الأموال\n\n159\n00:10:14,976 --> 00:10:19,236\nوالسادسة السياسات\nالارتجالية في تسيير المياه\n\n160\n00:10:19,968 --> 00:10:20,828\nنستنتج\n\n161\n00:10:21,312 --> 00:10:25,712\nأن المياه في موريتانيا\nتنقسم إلى مياه سطحية\n\n162\n00:10:25,712 --> 00:10:28,800\nمثل مياها الأنطار ومياها نهر السنغال\n\n163\n00:10:29,280 --> 00:10:30,528\nومياه جوفية مثل\n\n164\n00:10:30,912 --> 00:10:32,300\nخزان ترارزة\n\n165\n00:10:33,408 --> 00:10:36,648\nوتعاني المياه من مشاكل عديدة منها الجفاف\n\n166\n00:10:37,824 --> 00:10:38,496\nوالآن حان\n\n167\n00:10:38,880 --> 00:10:39,964\nوقت الملخص\n\n168\n00:10:40,800 --> 00:10:41,952\nاسمعوه جيدا فهو\n\n169\n00:10:42,336 --> 00:10:43,880\nخلاصة الدرس كله\n\n170\n00:10:44,832 --> 00:10:46,892\nأولاً المناخ والنبات\n\n171\n00:10:48,096 --> 00:10:53,656\nيتأثر المناخ الموريتاني بالموقع\nالجغرافي وبمراكس الضغط المرتفع\n\n172\n00:10:53,656 --> 00:10:53,760\nوبأنواع\n\n173\n00:10:54,144 --> 00:10:55,256\nالرياح\n\n174\n00:10:56,256 --> 00:10:59,416\nويمكن تقسيم المناخ إلى قسمين رئيسيين\n\n175\n00:11:00,384 --> 00:11:01,724\nالإقليم الساحلي\n\n176\n00:11:02,304 --> 00:11:05,924\nيمتد شمالا إلى خط نواكشوت تشجا النعمة\n\n177\n00:11:06,912 --> 00:11:11,232\nتراوح متوسطات الأمطار ما\nبين 300 ملي متر في روسو\n\n178\n00:11:11,232 --> 00:11:14,232\nو140 مليمتر في نواكشوت\n\n179\n00:11:15,072 --> 00:11:16,992\nوتسوده نباتات السباسب\n\n180\n00:11:17,856 --> 00:11:18,956\nوالإقليم الصحراوي\n\n181\n00:11:19,776 --> 00:11:21,776\nيغطي ثلثي مساحة البلاد\n\n182\n00:11:22,464 --> 00:11:24,544\nوأنطاره قليلة ومتذبذبة\n\n183\n00:11:25,344 --> 00:11:28,800\nأما النبات فهو عبارة عن شجيرات صغيرة\n\n184\n00:11:29,568 --> 00:11:33,328\nكما تتميز المناطق الشاطئية\nبخصوصيتها المناخية\n\n185\n00:11:33,984 --> 00:11:36,184\nفهي على العموم معتدلة الحرارة\n\n186\n00:11:36,184 --> 00:11:41,344\nلكنها تأخذ طابعا صحراويا فيما\nيخص كمية الأمطار المحدودة\n\n187\n00:11:41,344 --> 00:11:43,200\nونباتاتها القليلة\n\n188\n00:11:43,872 --> 00:11:45,408\nثانيا المياه\n\n189\n00:11:46,368 --> 00:11:48,048\nتنقسم المياه إلى قسمين\n\n190\n00:11:49,056 --> 00:11:50,296\nالمياه السطحية\n\n191\n00:11:50,784 --> 00:11:56,256\nوتشمل مياه الأمطار ومياه الاودية\nوميها المحيط وميةها النهر\n\n192\n00:11:56,928 --> 00:11:58,088\nوالمياه الجوفية\n\n193\n00:11:58,848 --> 00:12:04,568\nوتتوفر في شكل خزانات كبرى\nمثل الخزان الغربي خزين ترارزة\n\n194\n00:12:04,568 --> 00:12:08,908\nوخزين التاودني بحيرة أظهر والخزان الفيضي\n\n195\n00:12:09,984 --> 00:12:15,962\nوتعاني المياه من عدة مشاكل\nمنها الجفاف والتلوث والاستغلال\n\n196\n00:12:15,962 --> 00:12:22,044\nالمفرط ونقص رؤوس الأموال وعدم\nنجاعة السياسات في هذا المجال\n\n197\n00:12:22,944 --> 00:12:24,384\nنشاط سياقي أي\n\n198\n00:12:24,768 --> 00:12:26,880\nنشات من واقع حياتكم\n\n199\n00:12:27,552 --> 00:12:31,792\nاكتبوا تقريرا عن المصادر المائية\nفي المنطقة التي تعيشون فيها\n\n200\n00:12:31,792 --> 00:12:31,968\nوعن\n\n201\n00:12:32,352 --> 00:12:34,392\nالمشاكل التي تعاني منها\n\n202\n00:12:35,040 --> 00:12:38,260\nثم عرضوه على زملائكم في الفصل للنقاش\n\n203\n00:12:39,360 --> 00:12:41,856\nوالآن لنختبر ما فهمناه\n\n204\n00:12:42,432 --> 00:12:43,584\nأسئلة التقويم\n\n205\n00:12:43,968 --> 00:12:49,272\nأوقفوا الفيديو وحاولوا الإجابة\nبأنفسكم ثم استمعوا إلى التصحح\n\n206\n00:12:50,112 --> 00:12:51,072\nالسؤال الأول\n\n207\n00:12:51,648 --> 00:12:55,128\nضعوا علامة صح أو خطأ أمام العبارات التالية\n\n208\n00:12:55,872 --> 00:12:56,812\nالعبارة الأولى\n\n209\n00:12:57,408 --> 00:13:02,208\nموريتانيا مناخها حار بسبب\nوقوعها في المنطقة المعتدلة\n\n210\n00:13:02,784 --> 00:13:03,344\nالإجابة\n\n211\n00:13:04,224 --> 00:13:04,604\nخطأ.\n\n212\n00:13:05,184 --> 00:13:11,464\nلأن مناخها حار بسبب وقوعها في\nالمنطقة البيمدارية أي بين المدارين\n\n213\n00:13:11,464 --> 00:13:13,424\nوليس في المنتقة المعتدلة\n\n214\n00:13:14,400 --> 00:13:15,360\nالعبارة الثانية\n\n215\n00:13:16,320 --> 00:13:20,160\nيغطي المناخ الصحراوي ثلث مساحة موريتانيا\n\n216\n00:13:20,832 --> 00:13:21,432\nالإجابة\n\n217\n00:13:22,272 --> 00:13:22,652\nخطأ.\n\n218\n00:13:23,232 --> 00:13:28,392\nفالمناخ الصحراوي يغطي ثلثي\nمساحة البلاد وليس ثلاثا واحدا\n\n219\n00:13:29,568 --> 00:13:30,648\nالعبارة الثالثة\n\n220\n00:13:31,584 --> 00:13:35,304\nتنتشر نباتات السباسب\nفي مجال المناخ الساحلي\n\n221\n00:13:36,192 --> 00:13:37,592\nالإجابة صح\n\n222\n00:13:38,496 --> 00:13:39,516\nالعبارة الرابعة\n\n223\n00:13:40,320 --> 00:13:43,320\nالمياه السطحية تتواجد في باطن الأرض\n\n224\n00:13:44,160 --> 00:13:45,700\nالإجابة خطأ\n\n225\n00:13:46,272 --> 00:13:51,032\nفالمياه السطحية تكون على\nسطح الأرض مثل الأنطار والنهر\n\n226\n00:13:51,032 --> 00:13:56,052\nأما التي في باطن الأرض فهي\nالمياه الجوفية السؤال الثاني\n\n227\n00:13:56,736 --> 00:14:02,216\nوضحوا على شكل خطاطة العوامل\nالمؤثرة في المناخ الموريتاني\n\n228\n00:14:03,264 --> 00:14:04,584\nتخيلوا معي خطاطة\n\n229\n00:14:05,664 --> 00:14:07,744\nفي الوسط دائرة كتبنا فيها\n\n230\n00:14:08,448 --> 00:14:09,668\nالمناخ المريتاني\n\n231\n00:14:10,656 --> 00:14:12,696\nوتخرج منها ثلاثة أسهم\n\n232\n00:14:13,536 --> 00:14:14,336\nالسهم الأول\n\n233\n00:14:15,168 --> 00:14:16,288\nالموقع الفلكي\n\n234\n00:14:17,184 --> 00:14:21,684\nبين دائرتين عرض 15 و 27 شمالاً\n\n235\n00:14:22,368 --> 00:14:24,288\nفي المنطقة البيمدارية\n\n236\n00:14:24,672 --> 00:14:25,536\nوالنتيجة\n\n237\n00:14:26,112 --> 00:14:27,192\nارتفاع الحرارة\n\n238\n00:14:28,128 --> 00:14:28,988\nالسهم الثاني\n\n239\n00:14:29,856 --> 00:14:31,396\nمراكز الضغط والرياح\n\n240\n00:14:32,160 --> 00:14:33,216\nالصحراوي\n\n241\n00:14:33,696 --> 00:14:35,356\nرياح حارة وجافة\n\n242\n00:14:36,096 --> 00:14:40,896\nوالآسوري رياح بحرية تعدل\nالحرارة على الشواطئ\n\n243\n00:14:41,760 --> 00:14:42,912\nوسانت هيلانا\n\n244\n00:14:43,392 --> 00:14:45,892\nرياح موسمية تجلب المطر\n\n245\n00:14:46,848 --> 00:14:47,708\nالسهم الثالث\n\n246\n00:14:48,576 --> 00:14:49,676\nالغطاء النباتي\n\n247\n00:14:50,592 --> 00:14:52,704\nيؤثر في الحرارة والرطوبة ويظهر\n\n248\n00:14:53,088 --> 00:14:54,752\nفي أقصى الجنوب\n\n249\n00:14:55,488 --> 00:14:56,428\nالسؤال الثالث\n\n250\n00:14:57,120 --> 00:14:59,320\nبما يتميز الإقليم الصحراوي\n\n251\n00:15:00,192 --> 00:15:00,864\nالإجابة\n\n252\n00:15:01,632 --> 00:15:03,772\nيغطي ثلثي مساحة البلاد\n\n253\n00:15:04,608 --> 00:15:06,708\nوترتفع فيه درجات الحرارة\n\n254\n00:15:07,488 --> 00:15:12,480\nوأنطاره قليلة 125 مليمترا في السنة\n\n255\n00:15:13,056 --> 00:15:14,208\nومتذبذبة ومدى\n\n256\n00:15:14,592 --> 00:15:18,896\nالحرارة فيه كبير خاصة بين النهار والليل\n\n257\n00:15:18,896 --> 00:15:25,056\nونباته أعشاب صيفية قصيرة\nالعمر وشجيرات صغيرة شائكة\n\n258\n00:15:25,632 --> 00:15:26,652\nالسؤال الرابع\n\n259\n00:15:27,456 --> 00:15:29,276\nحددوا مشاكل المياه\n\n260\n00:15:29,952 --> 00:15:30,816\nالإجابة\n\n261\n00:15:31,200 --> 00:15:34,532\nالجفاف وقلة التساقطات المطرية\n\n262\n00:15:35,232 --> 00:15:36,832\nوتلوث نهر السنغال\n\n263\n00:15:37,536 --> 00:15:39,856\nوتزايد الطلب على الماء في المدن\n\n264\n00:15:40,704 --> 00:15:42,804\nوقلة الأطر المتخصصة\n\n265\n00:15:43,488 --> 00:15:48,568\nونقص رؤوس الأموال والسياسات\nالارتجالية في تسير المياه\n\n266\n00:15:49,152 --> 00:15:52,992\nوهكذا يا أحبائي نكون قد أنهينا درسنا\n\n267\n00:15:53,568 --> 00:15:55,888\nلنراجع في ثلاث جمل فقط\n\n268\n00:15:56,640 --> 00:16:04,700\nالأولى مناخ موريتانيا حار بسبب الموقع\nالفلكي ومراكز الضغط والرياح والغطاء النباتي\n\n269\n00:16:05,664 --> 00:16:09,504\nالثانية لموريتانيا إقليمان مناخيان الساحلي\n\n270\n00:16:09,888 --> 00:16:11,624\nوالصحراوي\n\n271\n00:16:11,624 --> 00:16:13,920\nوكلما زاد المطر كثر\n\n272\n00:16:14,304 --> 00:16:15,084\nالنبات\n\n273\n00:16:16,032 --> 00:16:18,472\nالثالثة المياه نوعان\n\n274\n00:16:18,472 --> 00:16:24,072\nسطحية وجوفية وأهم مشاكلها الجفاف والتلوث\n\n275\n00:16:24,768 --> 00:16:29,308\nأحسنتم يا أبطال الجغرافية\nأعيد شكري لكم على حسن الإصغاء\n\n276\n00:16:29,308 --> 00:16:34,868\nوإلى اللقاء في درس جديد إن شاء\nالله والسلام عليكم ورحمة الله\n";
+'use strict';
+/* Cours 3D — المناخ والنبات والمياه في موريتانيا
+   Toute l'animation est calculée à partir du temps t (audio ou horloge manuelle) :
+   pause = image figée, déplacement = scène recalée immédiatement. */
+const $=i=>document.getElementById(i);
+const DUR_DEFAULT=995;
+const PARTS=[['Intro',0],['1 · Facteurs',54],['2 · Régions',234],['3 · Eaux',433],['Résumé',638],['Évaluation',742]];
+/* b = scène ; at/times = instants (s) où chaque élément énuméré apparaît, relevés dans le SRT */
+const SC=[
+ {s:0,b:'globe'},
+ {s:54,b:'pillarsF',at:[77.5,79.3,81.0]},
+ {s:84,b:'astro'},
+ {s:123,b:'pressure'},
+ {s:204,b:'vegcover'},
+ {s:234,b:'regions'},
+ {s:391,b:'rainveg'},
+ {s:433,b:'watersA'},
+ {s:464,b:'rain'},
+ {s:484,b:'river'},
+ {s:538,b:'ocean'},
+ {s:548,b:'aquifer'},
+ {s:585,b:'problems',times:[592,597.8,602.5,608.2,611.8,614.9]},
+ {s:620,b:'watersB'},
+ {s:638,b:'regionsAll'},
+ {s:743,b:'book'},
+ {s:760,b:'qmark'},
+ {s:837,b:'pillarsQ',at:[853.5,868.1,886.8]},
+ {s:895.5,b:'regionsDesert'},
+ {s:925.5,b:'problems',times:[931.2,935.2,937.5,940.7,943.5,946.5]},
+ {s:949,b:'pillarsR',at:[956.6,965.7,976]}
+];
+
+/* ---------- Three.js : outils ---------- */
+let fit=1,R,SCN,CAM,grp=null,upd=null,look=null,orbit=0,camBase=null;
+const M=(c,o)=>new THREE.MeshStandardMaterial(Object.assign({color:c,roughness:.8},o||{}));
+function mk(geo,c,x=0,y=0,z=0,o){const m=new THREE.Mesh(geo,M(c,o));m.position.set(x,y,z);return m}
+const clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
+const W=(t,a,b)=>t>=a&&t<b;
+const glow=(m,c,k)=>{m.material.emissive.setHex(c);m.material.emissiveIntensity=k};
+const P=(lon,lat)=>[(lon+11)*.6,(lat-21)*.6];                 // forme : x, y (z = −y)
+const XZ=(lon,lat)=>{const q=P(lon,lat);return[q[0],-q[1]]};
+const ease=k=>{k=clamp(k);const c=1.70158,u=k-1;return 1+(c+1)*u*u*u+c*u*u};
+const pop=(o,t,t0,s=1)=>{o.visible=t>=t0;o.scale.setScalar(Math.max(.001,s*ease((t-t0)/.7)))};
+/* Contour réel de la Mauritanie, extrait de la carte fournie (lon, lat) */
+const MR=[[-4.86, 25.16], [-5.65, 25.74], [-6.02, 25.93], [-6.42, 26.27], [-6.75, 26.43], [-7.03, 26.68], [-7.15, 26.71], [-7.49, 26.93], [-7.64, 27.1], [-8.0, 27.29], [-8.07, 27.23], [-8.03, 26.99], [-8.13, 26.76], [-8.13, 26.13], [-8.28, 26.02], [-11.48, 26.07], [-11.45, 25.96], [-11.55, 25.74], [-11.51, 25.32], [-11.58, 24.96], [-11.64, 24.91], [-11.64, 24.47], [-11.7, 24.41], [-11.67, 24.02], [-11.73, 23.58], [-11.88, 23.44], [-12.61, 23.44], [-12.95, 23.14], [-13.04, 21.53], [-13.13, 21.34], [-14.23, 21.28], [-16.92, 21.31], [-16.95, 21.06], [-17.04, 20.98], [-17.07, 20.78], [-16.98, 20.84], [-16.89, 21.03], [-16.76, 21.03], [-16.4, 20.73], [-16.4, 20.53], [-16.28, 20.31], [-16.34, 19.9], [-16.52, 19.68], [-16.58, 19.4], [-16.64, 19.34], [-16.37, 19.12], [-16.4, 18.68], [-16.31, 18.62], [-16.31, 18.29], [-16.09, 18.21], [-16.15, 17.93], [-16.4, 17.79], [-16.43, 17.52], [-16.55, 17.35], [-16.55, 17.24], [-16.7, 17.13], [-16.7, 16.99], [-16.86, 16.82], [-16.92, 16.41], [-16.76, 16.52], [-16.37, 16.41], [-16.06, 16.58], [-15.85, 16.49], [-15.67, 16.66], [-15.36, 16.66], [-15.18, 16.58], [-14.93, 16.6], [-14.81, 16.52], [-14.75, 16.55], [-14.6, 16.44], [-14.44, 16.1], [-14.17, 16.1], [-13.9, 15.86], [-13.77, 15.63], [-13.62, 15.55], [-13.47, 15.33], [-13.47, 15.25], [-13.19, 15.02], [-13.04, 14.8], [-13.01, 14.83], [-12.89, 14.75], [-12.74, 14.8], [-12.58, 14.78], [-12.46, 14.86], [-12.37, 15.08], [-12.4, 15.22], [-12.25, 15.3], [-12.25, 15.5], [-12.06, 15.63], [-11.94, 15.58], [-11.82, 15.41], [-11.88, 15.27], [-12.06, 15.27], [-12.06, 15.14], [-11.88, 15.11], [-11.79, 15.14], [-11.82, 15.22], [-11.7, 15.3], [-11.55, 15.22], [-11.33, 15.27], [-11.33, 15.47], [-11.21, 15.55], [-11.03, 15.58], [-10.9, 15.52], [-10.42, 15.52], [-10.32, 15.58], [-10.14, 15.58], [-9.96, 15.77], [-9.84, 15.69], [-9.84, 15.55], [-9.44, 15.61], [-6.02, 15.69], [-6.05, 15.86], [-5.96, 15.99], [-5.99, 16.19], [-5.93, 16.24], [-5.93, 16.46], [-6.08, 16.63], [-6.11, 16.85], [-6.11, 18.1], [-6.17, 18.15], [-6.3, 19.65], [-6.26, 20.01], [-6.33, 20.06], [-6.33, 20.67], [-6.39, 21.06], [-6.36, 21.42], [-6.42, 21.48], [-6.48, 22.11], [-6.45, 22.83], [-6.54, 22.97], [-6.54, 23.91], [-6.6, 23.97], [-6.63, 24.24], [-6.6, 24.94], [-6.66, 25.08], [-6.54, 25.16]];
+function pip(lo,la){let c=false;for(let i=0,j=MR.length-1;i<MR.length;j=i++){const a=MR[i],b=MR[j];if((a[1]>la)!=(b[1]>la)&&lo<(b[0]-a[0])*(la-a[1])/(b[1]-a[1])+a[0])c=!c}return c}
+const SL=[[-18,18.09],[-15.98,18.09],[-11.43,18.55],[-7.26,16.62],[-4.5,15.4]];     // ligne Nouakchott–Tidjikja–Néma
+function lineLat(lo){for(let i=0;i<SL.length-1;i++){const a=SL[i],b=SL[i+1];if(lo>=a[0]&&lo<=b[0])return a[1]+(b[1]-a[1])*(lo-a[0])/(b[0]-a[0])}return 15}
+function flat(pts,c,y,depth,o){const s=new THREE.Shape();pts.forEach((p,i)=>{const q=P(p[0],p[1]);i?s.lineTo(q[0],q[1]):s.moveTo(q[0],q[1])});
+  const g=depth?new THREE.ExtrudeGeometry(s,{depth,bevelEnabled:false}):new THREE.ShapeGeometry(s);g.rotateX(-Math.PI/2);return mk(g,c,0,y,0,o)}
+function lbl(t,x,y,z,s=1,col='#fff'){const c=document.createElement('canvas');c.width=512;c.height=128;const k=c.getContext('2d');
+  k.font='bold 54px Tahoma,Arial,sans-serif';k.textAlign='center';k.textBaseline='middle';const w=Math.min(500,k.measureText(t).width+44);
+  k.fillStyle='rgba(8,17,28,.72)';k.fillRect(256-w/2,18,w,92);k.fillStyle=col;k.fillText(t,256,66);
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),depthTest:false,transparent:true}));sp.position.set(x,y,z);sp.scale.set(3*s,.75*s,1);return sp}
+function glyph(t,col,bg,s=.6){const c=document.createElement('canvas');c.width=c.height=128;const k=c.getContext('2d');
+  if(bg){k.fillStyle=bg;k.beginPath();k.arc(64,64,58,0,7);k.fill()}k.fillStyle=col;k.font='bold 84px Arial,sans-serif';k.textAlign='center';k.textBaseline='middle';k.fillText(t,64,70);
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),depthTest:false,transparent:true}));sp.scale.set(s,s,1);return sp}
+const badge=n=>glyph(String(n),'#1a1206','#ffc933',.55);
+const mark=ok=>glyph(ok?'✓':'✗',ok?'#37d67a':'#ff4d4d',null,1.1);
+function seg(a,b,c,y=.27,w=.07){const dx=b[0]-a[0],dz=b[1]-a[1],d=Math.hypot(dx,dz),m=mk(new THREE.BoxGeometry(d,.06,w),c,(a[0]+b[0])/2,y,(a[1]+b[1])/2);m.material=new THREE.MeshBasicMaterial({color:c});m.rotation.y=-Math.atan2(dz,dx);return m}
+function link(a,b,c){const dx=b[0]-a[0],dy=b[1]-a[1],d=Math.hypot(dx,dy),m=mk(new THREE.BoxGeometry(d,.07,.07),c,(a[0]+b[0])/2,(a[1]+b[1])/2,0);m.material=new THREE.MeshBasicMaterial({color:c});m.rotation.z=Math.atan2(dy,dx);return m}
+function ovl(draw){const c=document.createElement('canvas');c.width=c.height=1024;const k=c.getContext('2d');const X=l=>(l+17.5)/13*1024,Y=a=>(27.5-a)/13*1024;
+  k.beginPath();MR.forEach((p,i)=>i?k.lineTo(X(p[0]),Y(p[1])):k.moveTo(X(p[0]),Y(p[1])));k.closePath();k.clip();draw(k,X,Y);
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(7.8,7.8).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c),transparent:true,depthWrite:false}));m.position.y=.17;return m}
+function base(g){
+  g.add(mk(new THREE.PlaneGeometry(9,16).rotateX(-Math.PI/2),0x1f6fa8,-8.1,-.02,0),mk(new THREE.PlaneGeometry(14,16).rotateX(-Math.PI/2),0xb9a678,3.4,-.02,0));
+  const sl=flat(MR,0xe2bb6c,0,.15);g.add(sl);
+  const ol=new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(MR.map(p=>{const q=P(p[0],p[1]);return new THREE.Vector3(q[0],.19,-q[1])})),new THREE.LineBasicMaterial({color:0x5a4320}));g.add(ol);return sl}
+function city(g,n,lon,lat){const q=XZ(lon,lat),d=mk(new THREE.SphereGeometry(.1,10,8),0xffffff,q[0],.3,q[1]),l=lbl(n,q[0],.72,q[1],.5);g.add(d,l);return[d,l]}
+
+
+function tree(x,z,s=1,c=0x2e8b3a){const g=new THREE.Group();g.add(mk(new THREE.CylinderGeometry(.05,.07,.4,6),0x6b4a2b,0,.2,0),mk(new THREE.ConeGeometry(.28,.7,8),c,0,.7,0));g.position.set(x,.15,z);g.scale.setScalar(s);return g}
+function cloud(x,y,z,s=1,c=0xffffff){const g=new THREE.Group();[[0,0,0,.5],[.5,-.1,0,.4],[-.5,-.1,0,.4],[.2,.25,0,.35]].forEach(a=>g.add(mk(new THREE.SphereGeometry(a[3],12,10),c,a[0],a[1],a[2])));g.position.set(x,y,z);g.scale.setScalar(s);return g}
+function rain(g,x,y,z,w,n,sp=.8){const geo=new THREE.BufferGeometry(),a=new Float32Array(n*3),ph=Array.from({length:n},()=>[Math.random()-.5,Math.random(),Math.random()-.5]);
+  geo.setAttribute('position',new THREE.BufferAttribute(a,3));const pt=new THREE.Points(geo,new THREE.PointsMaterial({color:0x7fd0ff,size:.08}));pt.frustumCulled=false;g.add(pt);
+  return(t,c=n)=>{for(let i=0;i<n;i++){a[3*i]=x+ph[i][0]*w;a[3*i+1]=y*(1-((t*sp+ph[i][1])%1));a[3*i+2]=z+ph[i][2]*w}geo.attributes.position.needsUpdate=true;geo.setDrawRange(0,c)}}
+/* ---------- Icônes ---------- */
+const bas=c=>new THREE.MeshBasicMaterial({color:c});
+const I={
+ sun(){const g=new THREE.Group(),m=bas(0xffc933);g.add(new THREE.Mesh(new THREE.SphereGeometry(.45,16,12),m));for(let i=0;i<8;i++){const r=new THREE.Mesh(new THREE.BoxGeometry(.12,.35,.05),m),a=i*Math.PI/4;r.position.set(Math.cos(a)*.8,Math.sin(a)*.8,0);r.rotation.z=a-Math.PI/2;g.add(r)}return g},
+ drop(c=0x2f9be0){const g=new THREE.Group();g.add(mk(new THREE.SphereGeometry(.3,16,12),c,0,0,0),mk(new THREE.ConeGeometry(.27,.5,16),c,0,.4,0));return g},
+ thermo(h=1,c=0xff4a3a){const g=new THREE.Group();g.add(mk(new THREE.CylinderGeometry(.08,.08,1.3,10),0xdddddd,0,.65,0,{transparent:true,opacity:.55}),mk(new THREE.SphereGeometry(.17,12,10),c,0,0,0));
+  const m=mk(new THREE.CylinderGeometry(.045,.045,1,8),c);g.add(m);g.userData.set=v=>{v=clamp(v);m.scale.y=Math.max(.02,v*1.2);m.position.y=.1+v*.6};g.userData.set(h);return g},
+ wind(cols=[0xff7a1a,0x3fa7ff,0x3ddc84]){const g=new THREE.Group();cols.forEach((c,i)=>{const k=mk(new THREE.ConeGeometry(.17,.8,10),c,(i-1)*.45,0,0);k.rotation.z=-Math.PI/2;g.add(k)});return g},
+ tree(){const g=new THREE.Group(),t=tree(0,0,1.4);t.position.y=-.5;g.add(t);return g},
+ cloudRain(n=1){const g=new THREE.Group();g.add(cloud(0,.4,0,.75,0x9aa6b4));for(let i=0;i<3*n;i++)g.add(mk(new THREE.SphereGeometry(.05,6,6),0x7fd0ff,-.4+i*.8/(3*n),-.2-(i%2)*.2,0));return g},
+ map(reg){const g=new THREE.Group(),s=flat(MR,0xe2bb6c,0,.15);g.add(s);if(reg){const a=ovl((k,X,Y)=>{k.fillStyle='#78b24a';k.beginPath();SL.concat([[-4.5,14],[-18,14]]).forEach((p,i)=>i?k.lineTo(X(p[0]),Y(p[1])):k.moveTo(X(p[0]),Y(p[1])));k.fill()});g.add(a)}
+  const o=new THREE.Group();o.add(g);o.scale.setScalar(.2);o.rotation.x=Math.PI/2*.8;return o},
+ pin(){const g=new THREE.Group(),c=mk(new THREE.ConeGeometry(.15,.45,10),0xff3b3b,0,.25,0);c.rotation.x=Math.PI;g.add(c,mk(new THREE.SphereGeometry(.17,10,8),0xff3b3b,0,.55,0));return g},
+ drought(){const g=new THREE.Group();g.add(mk(new THREE.CylinderGeometry(.7,.7,.12,20),0xb08a5a,0,-.3,0));for(let k=0;k<4;k++){const c=mk(new THREE.BoxGeometry(1.1,.02,.05),0x3b2a14,0,-.23,0);c.rotation.y=k*.8;g.add(c)}const s=I.sun();s.scale.setScalar(.6);s.position.y=.5;g.add(s);return g},
+ pollution(){const g=new THREE.Group();g.add(mk(new THREE.CylinderGeometry(.7,.7,.12,20),0x2f86c8,0,-.3,0));for(let k=0;k<6;k++)g.add(mk(new THREE.SphereGeometry(.12,8,8),0x222222,Math.cos(k*1.1)*.5,-.15+(k%2)*.2,Math.sin(k*1.1)*.5));const c=cloud(0,.55,0,.5,0x555555);g.add(c);return g},
+ city(){const g=new THREE.Group();[[0,.5],[.45,.8],[-.45,.35]].forEach(a=>g.add(mk(new THREE.BoxGeometry(.4,a[1]*1.4,.4),0x9aa4b0,a[0],a[1]*.7-.4,0)));const d=I.drop();d.scale.setScalar(.5);d.position.set(0,.6,.5);g.add(d);return g},
+ expert(){const g=new THREE.Group(),one=new THREE.Group();one.add(mk(new THREE.CylinderGeometry(.18,.24,.7,10),0xe9c27a,0,-.1,0),mk(new THREE.SphereGeometry(.2,12,10),0xf0c9a0,0,.4,0));g.add(one);[-.7,.7].forEach(x=>{const p=one.clone();p.position.x=x;p.traverse(n=>{if(n.material){n.material=n.material.clone();n.material.transparent=true;n.material.opacity=.15}});g.add(p)});return g},
+ coins(){const g=new THREE.Group();for(let k=0;k<5;k++)g.add(mk(new THREE.CylinderGeometry(.35,.35,.1,20),0xffc933,0,-.4+k*.12,0));g.add(glyph('$','#ffc933',null,.6));g.children[g.children.length-1].position.y=.5;return g},
+ improv(){const g=new THREE.Group(),q=glyph('؟','#ffc933',null,1);q.position.y=.1;g.add(q);let p=[-.8,-.6];for(let k=0;k<3;k++){const n=[-.8+k*.8,k%2?-.2:-.6];g.add(link([p[0],p[1]-.25],[n[0],n[1]-.25],0xff7a1a));p=n}return g},
+ pie(f,c=0xe2bb6c){const g=new THREE.Group(),a=mk(new THREE.CylinderGeometry(.7,.7,.2,32,1,false,0,Math.PI*2*f),c),b=mk(new THREE.CylinderGeometry(.7,.7,.2,32,1,false,Math.PI*2*f,Math.PI*2*(1-f)),0x667788);g.add(a,b);g.rotation.x=1.2;const o=new THREE.Group();o.add(g);return o},
+ tuft(){const g=new THREE.Group();for(let k=0;k<5;k++){const c=mk(new THREE.ConeGeometry(.07,.6,5),k%2?0xb9b24a:0x9aa24a,(k-2)*.1,0,0);c.rotation.z=(k-2)*.25;g.add(c)}return g},
+ surfUnder(){const g=new THREE.Group();g.add(mk(new THREE.BoxGeometry(1.4,.12,.8),0x6aa84f,0,0,0),mk(new THREE.BoxGeometry(1.4,.5,.8),0x8a5a2b,0,-.31,0));const a=I.drop();a.scale.setScalar(.4);a.position.set(-.3,.35,0);const b=I.drop();b.scale.setScalar(.4);b.position.set(.3,-.4,.3);g.add(a,b);return g},
+ sunLines(){const g=new THREE.Group(),s=I.sun();s.scale.setScalar(.6);s.position.y=.4;g.add(s);[-.3,-.7].forEach(y=>g.add(link([-.8,y],[.8,y],0xffd24d)));return g}
+};
+/* alignement d'icônes énumérées : chacune apparaît (avec rebond) à son instant, la courante est agrandie */
+function row(g,defs,y,z,gap,sc,nums=true){const n=defs.length;
+  const its=defs.map((d,i)=>{const w=new THREE.Group();w.add(d.mk());w.position.set((i-(n-1)/2)*gap,y,z);if(nums){const b=badge(i+1);b.position.set(0,-1.05,0);w.add(b)}g.add(w);return{w,t:d.t}});
+  return t=>its.forEach((it,i)=>{const nx=its[i+1]?its[i+1].t:1e9,act=t>=it.t&&t<nx;pop(it.w,t,it.t,sc*(act?1.22:1));it.w.position.y=y+(act?.1*Math.sin(t*4):0)})}
+function bar(mm,x,z,txt){const g=new THREE.Group(),h=mm*.006;g.add(mk(new THREE.CylinderGeometry(.13,.13,h,14),0x2f9be0,0,h/2+.17,0),lbl(txt,0,h+.55,0,.5,'#7fd0ff'));g.position.set(x,0,z);g.userData.h=h;return g}
+function bush(x,z){const g=new THREE.Group();g.add(mk(new THREE.SphereGeometry(.18,8,6),0x4a5a2a,0,.3,0));for(let k=0;k<6;k++){const c=mk(new THREE.ConeGeometry(.03,.25,4),0x2a2a1a,Math.cos(k)*.16,.38+Math.sin(k*2)*.08,Math.sin(k)*.16);c.rotation.z=Math.cos(k)*.9;c.rotation.x=Math.sin(k)*.9;g.add(c)}g.position.set(x,.15,z);return g}
+function plant(x,z){const g=new THREE.Group();g.add(mk(new THREE.CylinderGeometry(.02,.02,.4,5),0x5a8a4a,0,.2,0),mk(new THREE.SphereGeometry(.12,8,6),0xe08aa8,0,.45,0));g.position.set(x,.15,z);return g}
+
+/* ---------- Scènes ---------- */
+const sc=()=>SC[si];
+const B={
+globe(g){CAM.position.set(0,.8,8.5);look=new THREE.Vector3(0,.2,0);
+  const s=mk(new THREE.SphereGeometry(1.6,40,30),0x1f6fa8),w=new THREE.LineSegments(new THREE.WireframeGeometry(new THREE.SphereGeometry(1.62,16,12)),new THREE.LineBasicMaterial({color:0x7fd0ff}));
+  const pin=I.pin();pin.position.set(1.62,0,0);pin.rotation.z=-Math.PI/2;const gg=new THREE.Group();gg.add(s,w,pin);gg.position.y=1.4;g.add(gg);
+  const o=(a,b)=>{const t=I.thermo(.8);const s=I.sun();s.scale.setScalar(.35);s.position.set(.5,.9,0);const r=new THREE.Group();r.add(t,s);return r};
+  const d=[{t:29.5,mk:()=>o()},{t:35.6,mk:()=>{const r=new THREE.Group(),m=I.map(false);m.scale.setScalar(.17);r.add(m);return r}},
+   {t:40.8,mk:()=>{const r=new THREE.Group(),a=I.tree(),b=I.drop();b.scale.setScalar(.6);b.position.set(.9,0,0);a.position.x=-.4;r.add(a,b);return r}},
+   {t:45.9,mk:()=>{const r=new THREE.Group(),a=I.drop();const b=I.drought();b.scale.setScalar(.6);b.position.x=.9;r.add(a,b);return r}}];
+  const rw=row(g,d,-1.7,1.6,2.5,.9);
+  return t=>{gg.rotation.y=t*.25-1.2;gg.rotation.x=.3;rw(t)}},
+pillars(g,kind){const at=sc().at;CAM.position.set(0,1.5,10);look=new THREE.Vector3(0,.6,0);
+  const cen=new THREE.Group();cen.add(mk(new THREE.SphereGeometry(.8,24,18),0xffffff),cloud(0,.9,0,.6),I.drop(0x2f9be0));cen.children[2].scale.setScalar(.35);cen.children[2].position.set(.9,.3,.3);cen.position.y=2.8;g.add(cen);
+  const X=[-3.6,0,3.6],ln=X.map((x,i)=>{const l=link([0,2.2],[x*.9,.7],0xe9c27a);g.add(l);return l});
+  let defs;
+  if(kind=='R')defs=[{t:at[0],mk:()=>{const r=new THREE.Group(),a=I.thermo(1),s=I.sun();s.scale.setScalar(.45);s.position.set(.7,.7,0);r.add(a,s);return r}},
+    {t:at[1],mk:()=>{const r=new THREE.Group(),m=I.map(true);m.scale.setScalar(.13);const d=I.cloudRain();d.scale.setScalar(.6);d.position.set(.9,.2,0);const t=I.tree();t.scale.setScalar(.6);t.position.set(-.9,0,0);r.add(m,d,t);return r}},
+    {t:at[2],mk:()=>{const r=new THREE.Group(),a=I.drop(),b=I.surfUnder();b.scale.setScalar(.7);b.position.x=1;a.position.x=-.7;r.add(a,b);return r}}];
+  else defs=[{t:at[0],mk:()=>{const r=new THREE.Group(),s=I.sun();s.scale.setScalar(1.1);r.add(s);return r}},{t:at[1],mk:()=>{const w=I.wind();w.scale.setScalar(1.3);return w}},{t:at[2],mk:()=>I.tree()}];
+  const rw=row(g,defs,-.3,0,3.6,1);
+  let ex=null;
+  if(kind=='Q'){const th=I.thermo(.2),ws=I.wind();ws.scale.setScalar(.5);const w3=[0xff7a1a,0x3fa7ff,0x3ddc84].map((c,i)=>{const k=mk(new THREE.ConeGeometry(.12,.5,8),c,(i-1)*.5,0,0);k.rotation.z=-Math.PI/2;return k});
+    th.position.set(-3.6,-3,0);g.add(th);const wg=new THREE.Group();w3.forEach(k=>wg.add(k));wg.position.set(0,-3,0);g.add(wg);
+    const dr=I.drop();dr.scale.setScalar(.7);dr.position.set(3.6,-3,0);g.add(dr);
+    ex=t=>{th.visible=t>=867.2;th.userData.set(clamp((t-867.2)/4));w3.forEach((k,i)=>pop(k,t,[872,876,882.9][i]));dr.visible=t>=890}}
+  return t=>{cen.position.y=2.8+.1*Math.sin(t*1.5);ln.forEach((l,i)=>pop(l,t,at[i]-.3,1));rw(t);if(ex)ex(t)}},
+astro(g){CAM.position.set(0,8,8.5);look=new THREE.Vector3(0,0,0);orbit=1.5;base(g);
+  const ls=[15,23.4,27].map((l,i)=>{const m=mk(new THREE.BoxGeometry(11,.05,.07),[0xffd24d,0xff5a3c,0xffd24d][i],0,.25,-(l-21)*.6);m.material=bas([0xffd24d,0xff5a3c,0xffd24d][i]);g.add(m);return m});
+  g.add(lbl('15° N',-5.1,.6,3.6,.6),lbl('مدار السرطان',-4.7,.6,-1.44,.8),lbl('27° N',-5.1,.6,-3.6,.6));
+  const band=mk(new THREE.PlaneGeometry(11,(23.4-14.5)*.6).rotateX(-Math.PI/2),0xff3b1f,0,.28,(-1.44+3.9)/2,{transparent:true,opacity:.3});g.add(band);
+  const sun=I.sun();sun.scale.setScalar(1.3);sun.position.set(0,5,-1);sun.rotation.x=-.5;g.add(sun);
+  const th=I.thermo(.1);th.scale.setScalar(1.8);th.position.set(5.2,0,0);g.add(th);
+  return t=>{sun.scale.setScalar(1.3+.15*Math.sin(t*2));ls[0].scale.y=ls[2].scale.y=W(t,91,99.5)?3+Math.sin(t*6):1;ls[1].scale.y=W(t,99.5,110)?3+Math.sin(t*6):1;
+    band.material.opacity=W(t,100,123)?.25+.2*Math.sin(t*3):.05;th.userData.set(.1+.9*clamp((t-110)/7))}},
+pressure(g){CAM.position.set(0,9.5,8.5);look=new THREE.Vector3(-1,0,-.5);orbit=.8;base(g);
+  const C=[[0xff7a1a,3.5,-5.5,'الصحراوي',139,154],[0x3fa7ff,-6,-5,'الآسوري',154,177],[0x3ddc84,-5.6,3.6,'سانت هيلانا',177,192]];
+  const it=C.map(a=>{const d=mk(new THREE.CylinderGeometry(.9,.9,.12,32),a[0],a[1],.15,a[2]);g.add(d,lbl(a[3],a[1],1.1,a[2],.8));
+    const ps=[...Array(8)].map(()=>{const s=mk(new THREE.SphereGeometry(.13,8,8),a[0]);g.add(s);return s});return{a,d,ps}});
+  const e1=new THREE.Group(),th1=I.thermo(1);e1.add(th1);const s1=I.sun();s1.scale.setScalar(.5);s1.position.set(.6,.9,0);e1.add(s1);const q1=XZ(-9.5,22.5);e1.position.set(q1[0],.4,q1[1]);e1.scale.setScalar(1.4);
+  const e2=new THREE.Group(),th2=I.thermo(.45,0x4cc3d9);e2.add(th2);const nd=I.drop(0x2f9be0);nd.scale.setScalar(.45);nd.position.set(.7,.3,0);e2.add(nd,glyph('✗','#ff4d4d',null,.7));e2.children[2].position.set(.7,.3,.1);const q2=XZ(-15.6,19.6);e2.position.set(q2[0],.4,q2[1]);e2.scale.setScalar(1.3);
+  const e3=I.cloudRain(2);const q3=XZ(-9.5,15.8);e3.position.set(q3[0],2.3,q3[1]);e3.scale.setScalar(1.8);const rn=rain(g,q3[0],2.1,q3[1],2.4,70,.7);
+  g.add(e1,e2,e3);
+  return t=>{it.forEach(({a,d,ps})=>{const on=W(t,a[4],a[5]),k=on?1:(t<139||t>=192?.6:.15);glow(d,a[0],k*.8);
+    ps.forEach((s,i)=>{const f=(t*.22+i/8)%1;s.position.set(a[1]*(1-f),.5+Math.sin(f*Math.PI)*.6,a[2]*(1-f));s.scale.setScalar(k)})});
+    pop(e1,t,145.3,1.4);pop(e2,t,159.8,1.3);pop(e3,t,182.4,1.8);rn(t,t>=182.4?70:0);th1.userData.set(clamp((t-145.3)/3))}},
+vegcover(g){CAM.position.set(0,8.6,8.2);look=new THREE.Vector3(0,0,.4);orbit=1.2;base(g);const T=[];let n=0;
+  for(let lo=-13.2;lo<-6;lo+=.55)for(let la=15.75;la<17.2;la+=.42)if(pip(lo,la)&&n<44){const q=XZ(lo+(n%3)*.07,la);const tr=tree(q[0],q[1],1.15);g.add(tr);T.push([tr,n++])}
+  for(let i=0;i<4;i++){const q=XZ(-12+i*1.6,19.5);g.add(tree(q[0],q[1],.45,0x9aa24a))}
+  const q=XZ(-9.5,16.5),fl=new THREE.Group(),th=I.thermo(.35,0x4cc3d9),dr=I.drop();dr.position.set(.7,.2,0);fl.add(th,dr);fl.position.set(q[0],1.7,q[1]);fl.scale.setScalar(1.3);g.add(fl);
+  const ring=mk(new THREE.TorusGeometry(1.5,.05,8,40),0xffd24d,q[0],.3,q[1]);ring.rotation.x=Math.PI/2;ring.material=bas(0xffd24d);g.add(ring);
+  return t=>{T.forEach(([tr,i])=>{tr.scale.setScalar(1.15*ease((t-206.8-i*.2)/1.5)*(1+.03*Math.sin(t*2+i)));tr.rotation.z=Math.sin(t*1.5+i)*.05});
+    pop(fl,t,210.3,1.3);ring.visible=t>=216.5;ring.scale.setScalar(1+.12*Math.sin(t*4))}},
+regions(g,mode='main'){CAM.position.set(0,8.6,8.2);look=new THREE.Vector3(0,0,.2);orbit=1;const sl=base(g);
+  const sah=ovl((k,X,Y)=>{k.fillStyle='#78b24a';k.beginPath();SL.concat([[-4.5,14],[-18,14]]).forEach((p,i)=>i?k.lineTo(X(p[0]),Y(p[1])):k.moveTo(X(p[0]),Y(p[1])));k.fill()});
+  const cst=ovl((k,X,Y)=>{k.fillStyle='#35c4dc';k.fillRect(X(-18),Y(21.6),X(-15.6)-X(-18),Y(16.6)-Y(21.6))});g.add(sah,cst);
+  const none=1e9,TM={
+   main:{sp:270.7,win:{sahel:[283,318.7],desert:[318.7,367],coast:[367,391]},ev:{line:287.8,bars:294.2,steppe:302.8,two:321.9,heat:326.7,rain:327.5,irreg:335.8,range:340.3,herbs:351.5,shrubs:359.1,mild:372.9,dry:381.7,halo:386.8}},
+   all:{sp:659.4,win:{sahel:[660.4,677.9],desert:[677.9,689.6],coast:[689.6,704]},ev:{line:662.3,bars:666.9,steppe:675.1,two:679.8,heat:none,rain:682.5,irreg:684,range:none,herbs:none,shrubs:685.3,mild:694,dry:696.2,halo:701.3}},
+   desert:{sp:0,win:{desert:[895.5,925.5]},ev:{line:none,bars:none,steppe:none,two:901.6,heat:904.6,rain:907.5,irreg:913,range:914.6,herbs:918.9,shrubs:921.8,mild:none,dry:none,halo:none}}}[mode];
+  const E=TM.ev,IT=[],add=(o,t0,r,f,np)=>{g.add(o);IT.push({o,t0,r,f,np,s:o.scale.x})};
+  const NK=XZ(-15.98,18.09),TD=XZ(-11.43,18.55),NE=XZ(-7.26,16.62),RO=XZ(-15.8,16.5);
+  const cs=[city(g,'نواكشوط',-15.98,18.09),city(g,'تجكجة',-11.43,18.55),city(g,'النعمة',-7.26,16.62),city(g,'روسو',-15.8,16.5)];
+  if(mode!='desert'){
+   const ln=new THREE.Group();[[XZ(-16.3,18.09),NK],[NK,TD],[TD,NE],[NE,XZ(-6.1,16.1)]].forEach(a=>ln.add(seg(a[0],a[1],0xff3b3b,.3,.09)));add(ln,E.line,'sahel');
+   add(bar(140,NK[0]+.3,NK[1]-.5,'140 mm'),E.bars,'sahel');add(bar(300,RO[0]+.5,RO[1]+.3,'300 mm'),E.bars+4,'sahel');
+   let n=0;for(let lo=-15.2;lo<-7;lo+=.75)for(let la=15.9;la<18;la+=.5)if(pip(lo,la)&&la<lineLat(lo)-.25&&n<18){const q=XZ(lo,la),t=I.tuft();t.position.set(q[0],.3,q[1]);add(t,E.steppe+n*.15,'sahel');n++}}
+  {
+   const pie=I.pie(2/3),pg=new THREE.Group();pg.add(pie,lbl('2/3',0,1.1,0,.5,'#e9c27a'));pg.position.set(-5.2,.9,-2.2);pg.scale.setScalar(1.3);add(pg,E.two,'desert');
+   const DC=XZ(-9.5,22.3),hg=new THREE.Group(),ht=I.thermo(1),hs=I.sun();hs.scale.setScalar(.5);hs.position.set(.6,1.1,0);hg.add(ht,hs);hg.position.set(DC[0]-.9,.3,DC[1]);hg.scale.setScalar(1.3);add(hg,E.heat,'desert');
+   const rb=bar(125,DC[0]+1.1,DC[1]+.3,'125 mm');add(rb,E.rain,'desert',t=>{if(t>=E.irreg){rb.children[0].scale.y=.4+.6*Math.abs(Math.sin(t*1.7));rb.children[0].position.y=rb.userData.h*rb.children[0].scale.y/2+.17}});
+   const rg=new THREE.Group(),sm=mk(new THREE.SphereGeometry(.4,16,12),0xffc933,0,2.4,0),td=I.thermo(1),tn=I.thermo(.2,0x4a7aff);td.position.set(-.5,.2,0);tn.position.set(.5,.2,0);rg.add(sm,td,tn);rg.position.set(DC[0]-.1,.3,DC[1]+1.6);rg.scale.setScalar(1.2);
+   add(rg,E.range,'desert',t=>{const d=Math.floor(t/3)%2==0;sm.material.color.setHex(d?0xffc933:0x9ab4ff);sm.material.emissive.setHex(d?0xff8a00:0x2a3a88);td.visible=d;tn.visible=!d;if(t>=E.herbs)rg.visible=false});
+   const hb=[];for(let k=0;k<9;k++){const q=XZ(-11.5+(k%3)*1.1,21.5+Math.floor(k/3)*.8),t=I.tuft();t.position.set(q[0],.3,q[1]);t.children.forEach(c=>c.material.color.setHex(0x7ac24a));add(t,E.herbs,'desert',tt=>{const c=((tt-E.herbs-k*.2)%6)/6;t.scale.setScalar(Math.max(.01,Math.sin(Math.PI*clamp(c))));t.visible=tt>=E.herbs},true)}
+   [[-10.5,22.8],[-8.5,21.6],[-7.5,23.3],[-9.5,24.4]].forEach((p,k)=>{const q=XZ(p[0],p[1]);add(bush(q[0],q[1]),E.shrubs+k*.4,'desert')})}
+  if(mode!='desert'){
+   const C1=XZ(-16.1,19.6),mt=I.thermo(.45,0x4cc3d9);mt.position.set(C1[0],.3,C1[1]);mt.scale.setScalar(1.2);add(mt,E.mild,'coast');
+   const C2=XZ(-16.0,20.5);add(bar(40,C2[0],C2[1],'40 mm'),E.dry,'coast');
+   [18.6,19.2,19.8,20.4,21].forEach((la,k)=>{const q=XZ(-16.1,la);add(plant(q[0]-.1,q[1]),E.halo+k*.3,'coast')})}
+  return t=>{const fin=mode=='all'&&t>=704,act=r=>TM.win[r]&&W(t,TM.win[r][0],TM.win[r][1]);
+    const lv=(r,c)=>t<TM.sp?0:(act(r)||fin)?.92:(TM.win[r]&&t>=TM.win[r][1]?.4:.18);
+    sah.material.opacity=mode=='desert'?0:lv('sahel');cst.material.opacity=mode=='desert'?0:lv('coast');
+    glow(sl,0xff8a2a,act('desert')?.3+.2*Math.sin(t*3):0);cs.forEach(c=>{c[0].visible=c[1].visible=t>=TM.sp});
+    IT.forEach(it=>{const on=act(it.r)||fin;if(!it.np)pop(it.o,t,it.t0,it.s);if(it.f)it.f(t);if(!on)it.o.visible=false})}},
+rainveg(g){CAM.position.set(0,4.5,10);look=new THREE.Vector3(0,1.5,0);const ups=[],sd=[];
+  [[-3.2,1],[3.2,0]].forEach(([x,lush])=>{const s=new THREE.Group();s.add(mk(new THREE.BoxGeometry(5.5,.3,5),lush?0x5aa14a:0xd8b26a,0,-.15,0),cloud(0,4,0,lush?1.5:.7,lush?0x8e9aa8:0xf0f0f0));
+    const n=lush?16:3;for(let i=0;i<n;i++){const tr=lush?tree(-2+(i%4)*1.3,-1.8+Math.floor(i/4)*1.2,1.1):tree(-1.5+i*1.5,0,.5,0x9aa24a);s.add(tr)}
+    s.position.x=x;g.add(s);sd.push(s);ups.push(rain(g,x,3.7,0,4.5,lush?160:6,.9))});
+  return t=>{ups[0](t);ups[1](t);const a=W(t,401,407)||W(t,412.9,416),b=W(t,407,412.9)||W(t,416,424);sd[0].scale.setScalar(a?1.08:1);sd[1].scale.setScalar(b?1.08:1)}},
+waters(g,mode){CAM.position.set(0,3.5,10);look=new THREE.Vector3(0,.4,0);const A=mode=='A';
+  const sf=new THREE.Group(),un=new THREE.Group();g.add(sf,un);sf.position.x=-3;un.position.x=3;
+  sf.add(mk(new THREE.BoxGeometry(5,.3,4),0x6aa84f,0,-.15,0));const lake=mk(new THREE.CylinderGeometry(1.2,1.2,.1,32),0x2f86c8,0,.02,.3);sf.add(lake,mk(new THREE.BoxGeometry(.5,.05,4),0x2f86c8,1.9,.03,0));
+  [[0x8a6a3d,0],[0x6b4a2b,-.5],[0x777777,-1]].forEach((a,i)=>un.add(mk(new THREE.BoxGeometry(5,.5,4),a[0],0,-.25+a[1]-.25*i,0)));
+  const res=mk(new THREE.BoxGeometry(2.2,.5,2),0x2f86c8,0,-1.2,0,{transparent:true,opacity:.85});un.add(res);
+  const mkI={rain:()=>I.cloudRain(),river:()=>{const r=new THREE.Group();r.add(mk(new THREE.BoxGeometry(1.4,.06,.3),0x2f86c8,0,0,0));const m=mk(new THREE.BoxGeometry(1.4,.06,.3),0x2f86c8,.2,.25,0);r.add(m);return r},ocean:()=>{const r=new THREE.Group();r.add(mk(new THREE.BoxGeometry(1.5,.3,.8),0x1f6fa8));return r}};
+  let rw,dr=null;
+  if(A)rw=row(sf,[{t:459.8,mk:mkI.rain},{t:461.4,mk:mkI.river},{t:462.6,mk:mkI.ocean}],2.1,.4,1.6,.8,true);
+  else{rw=row(sf,[{t:625.7,mk:mkI.rain},{t:627.5,mk:mkI.river}],2.1,.4,1.8,.9,true);dr=I.drought();dr.position.set(0,1.1,0);dr.scale.setScalar(1.3);sf.add(dr)}
+  const rs=I.thermo(0);rs.visible=false;
+  return t=>{const a=A?W(t,452.3,454.4):W(t,621.3,625.7),b=A?W(t,454.4,457):W(t,629.3,633);glow(lake,0x2f86c8,a?.5+.3*Math.sin(t*5):.1);glow(res,0x2f86c8,b?.5+.3*Math.sin(t*5):.1);
+    sf.scale.setScalar(a?1.05:1);un.scale.setScalar(b?1.05:1);rw(t);if(dr)pop(dr,t,636.6,1.3)}},
+rain(g){CAM.position.set(0,4,9);look=new THREE.Vector3(0,1,0);
+  g.add(mk(new THREE.BoxGeometry(12,.3,6),0xb89a62,0,-.15,0),mk(new THREE.ConeGeometry(2,1.6,4),0x8a6a3d,-3.5,.7,-1.5),cloud(0,4,-.5,1.6,0x8e9aa8));
+  const r=rain(g,0,3.6,-.5,5,200,.9),wadi=mk(new THREE.PlaneGeometry(.6,5).rotateX(-Math.PI/2),0x2f86c8,-2,.02,.8);wadi.rotation.y=1.2;
+  const ponds=[[1,1.5],[3,0],[4,2]].map(p=>mk(new THREE.CylinderGeometry(.6,.6,.06,24),0x2f86c8,p[0],.03,p[1])),riv=mk(new THREE.BoxGeometry(12,.04,.5),0x2f86c8,0,.03,-2.5),sd=[...Array(8)].map((_,i)=>mk(new THREE.SphereGeometry(.09,8,8),0xffffff,0,0,0)),
+   dn=I.drop();dn.position.set(5,.8,-2.5);dn.scale.setScalar(.8);g.add(wadi,riv,...ponds,dn);
+  return t=>{r(t);wadi.visible=t>470;ponds.forEach(p=>p.visible=t>473);riv.visible=t>477;dn.visible=t>480;dn.position.y=.8+.15*Math.sin(t*3)}},
+river(g){CAM.position.set(-1.5,12.5,8);look=new THREE.Vector3(-1.5,0,1.6);base(g);
+  const PTS=[[-11.4,11.4],[-11.8,12.4],[-12.1,13.4],[-12.3,14.3],[-12.5,14.82],[-13.0,14.85],[-13.5,15.3],[-14.2,16.05],[-15.2,16.55],[-16.05,16.52],[-16.5,16.2]].map(p=>{const q=XZ(p[0],p[1]);return new THREE.Vector3(q[0],.24,q[1])});
+  const cv=new THREE.CatmullRomCurve3(PTS),sp=cv.getSpacedPoints(80),f=.4;
+  const tb=(a,b,c)=>{const m=mk(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(sp.slice(a,b)),50,.08,8),c);m.material=bas(c);g.add(m);return m},T1=tb(0,33,0x2f9be0),T2=tb(32,81,0x22e0b0),cut=(m,p)=>{const n=m.geometry.index.count;m.geometry.setDrawRange(0,Math.floor(n*p/6)*6)};
+  const s0=XZ(-11.4,11.4);[[-.5,0,.9],[.5,.1,.7],[0,-.5,1.1]].forEach(a=>g.add(mk(new THREE.ConeGeometry(.5,a[2],6),0x6b4a2b,s0[0]+a[0],a[2]/2,s0[1]+a[1])));g.add(lbl('فوتا جالون',s0[0],1.7,s0[1]+.3,.8));
+  const rk=XZ(-15.25,16.85),lake=mk(new THREE.CylinderGeometry(.35,.35,.05,20),0x2f9be0,rk[0],.22,rk[1]);g.add(lake,lbl('ركيز',rk[0],.8,rk[1]-.4,.5));
+  const wd=[['كوركول',[-12,17],[-13.5,16.1]],['كاراكورو',[-10.6,15.9],[-12.5,14.9]]].map(a=>{const p=XZ(a[1][0],a[1][1]),q=XZ(a[2][0],a[2][1]),m=seg(p,q,0x2f9be0,.24,.08);g.add(m,lbl(a[0],p[0],.7,p[1],.5));return m});
+  const b1=mk(new THREE.BoxGeometry(5.25,.2,.4),0x2f9be0,-2.4,.25,5.3),b2=mk(new THREE.BoxGeometry(1.5,.2,.4),0x22e0b0,-4.25,.25,6.1),l1=lbl('1750 km',.9,.85,5.3,.8,'#7fd0ff'),l2=lbl('500 km',-3.2,.85,6.1,.8,'#22e0b0');g.add(b1,b2,l1,l2);
+  const dot=mk(new THREE.SphereGeometry(.18,12,10),0xffffff);dot.material=bas(0xffffff);g.add(dot);
+  return t=>{const p=clamp((t-494)/31);cut(T1,clamp(p/f));cut(T2,clamp((p-f)/(1-f)));dot.visible=p>0&&p<1;if(dot.visible)dot.position.copy(cv.getPoint(p));lake.visible=t>507.8;wd.forEach(m=>m.visible=t>514);
+    const sh=t>=525;b1.visible=l1.visible=sh||t>=498;b2.visible=l2.visible=sh||t>=503}},
+ocean(g){CAM.position.set(0,4,8);look=new THREE.Vector3(0,0,0);const pl=new THREE.PlaneGeometry(12,8,40,30);pl.rotateX(-Math.PI/2);g.add(mk(pl,0x1f6fa8,-1.5,0,0));
+  const q=pl.attributes.position,x0=[...Array(q.count)].map((_,i)=>q.getX(i)),salt=[...Array(14)].map(()=>{const s=mk(new THREE.BoxGeometry(.12,.12,.12),0xffffff,-4+Math.random()*5,.3,-2+Math.random()*4);g.add(s);return s});
+  const mach=mk(new THREE.BoxGeometry(1.6,1.2,1.2),0x9aa4b0,4,.6,0),glass=mk(new THREE.CylinderGeometry(.35,.3,.8,16),0xbfeaff,4,.4,2,{transparent:true,opacity:.5}),wat=mk(new THREE.CylinderGeometry(.3,.27,.7,16),0x4cc3d9,4,.1,2);g.add(mach,glass,wat);
+  return t=>{for(let i=0;i<q.count;i++)q.setY(i,Math.sin(x0[i]*1.2+t*1.5)*.12);q.needsUpdate=true;const d=t>=545;salt.forEach((s,i)=>{s.rotation.y=t+i;s.position.y=.3+.1*Math.sin(t*2+i);s.visible=!d||i%2==0});
+    mach.visible=glass.visible=wat.visible=d;wat.scale.y=clamp((t-545)/3)+.01;wat.position.y=.05+.35*clamp((t-545)/3)}},
+aquifer(g){CAM.position.set(0,2.5,10);look=new THREE.Vector3(0,-.8,0);
+  [[0xc49a5a,.5],[0xd8b26a,1],[0x8a5a2b,1],[0x6e6e6e,1.2]].reduce((y,a)=>{g.add(mk(new THREE.BoxGeometry(11,a[1],3),a[0],0,y-a[1]/2,0));return y-a[1]},0);
+  g.add(mk(new THREE.BoxGeometry(2.2,.06,3),0x2f86c8,3.8,.03,0));
+  const Rs=[[-3.8,-1,2.8,.9,559.5,573,1],[0,-2.3,3,1,573,577.5,2],[3.8,-.6,2,.5,577.5,585,3]].map(a=>{const m=mk(new THREE.BoxGeometry(a[2],a[3],3.05),0x2f86c8,a[0],a[1],0,{transparent:true,opacity:.85}),b=badge(a[6]);b.position.set(a[0],a[1]+.9,1.7);g.add(m,b);return{m,a}});
+  g.add(lbl('ترارزة',-3.8,.5,1.8,.6),lbl('تاودني',0,-.9,1.8,.6),lbl('نهر السنغال',3.8,.5,1.8,.6));
+  return t=>Rs.forEach(({m,a})=>glow(m,0x4cc3d9,W(t,a[4],a[5])?.7+.3*Math.sin(t*5):t>=585||t<559.5?.35:.05))},
+problems(g){CAM.position.set(0,2.5,10.5);look=new THREE.Vector3(0,0,0);const ts=sc().times;
+  const defs=[I.drought,I.pollution,I.city,I.expert,I.coins,I.improv].map((f,i)=>({t:ts[i],mk:f}));
+  for(let i=0;i<6;i++)g.add(mk(new THREE.CylinderGeometry(.7,.7,.05,24),0x445566,(i-2.5)*1.9,-.65,0));
+  const rw=row(g,defs,0,0,1.9,.95,true);return t=>rw(t)},
+book(g){CAM.position.set(0,3,6);look=new THREE.Vector3(0,.3,0);const b=new THREE.Group();b.add(mk(new THREE.BoxGeometry(2,.15,2.8),0x2a5d8a),mk(new THREE.BoxGeometry(1.9,.2,2.7),0xffffff,0,.12,0));const pen=mk(new THREE.CylinderGeometry(.05,.05,1.6,8),0xffc933,.2,.5,0);pen.rotation.z=1.2;b.add(pen);
+  const d=I.drop();d.position.set(0,2,0);g.add(b,d);return t=>{b.rotation.y=t*.5;b.rotation.x=.4;pen.position.x=.2+Math.sin(t*3)*.4;d.position.y=2+.15*Math.sin(t*3)}},
+qmark(g){CAM.position.set(0,1.2,10);look=new THREE.Vector3(0,0,0);const c=mk(new THREE.BoxGeometry(1.8,1.8,1.8),0x2a5d8a),q=glyph('؟','#ffc933',null,1.6);g.add(c,q);
+  const ST=[776.8,796.3,811.6,820.3],AN=[784.2,802.3,816.2,824.2],OK=[0,0,1,0];
+  const ic=[I.sunLines,()=>I.pie(1/3),I.tuft,I.surfUnder].map((f,i)=>{const o=new THREE.Group(),x=(i-1.5)*2.8;o.add(f());o.position.set(x,0,0);const m=mark(OK[i]);m.position.set(x,-1.3,0);g.add(o,m);return{o,m,i}});
+  const p23=I.pie(2/3);p23.position.set(-.0+(1-1.5)*2.8,0,0);g.add(p23);
+  return t=>{c.visible=q.visible=t<776.8;c.rotation.y=t*.6;c.rotation.x=.3;q.position.set(0,2.2+.2*Math.sin(t*2),0);
+    ic.forEach(({o,m,i})=>{pop(o,t,ST[i],1.3);pop(m,t,AN[i],1.1)});ic[1].o.visible=t>=ST[1]&&t<803.2;p23.visible=t>=803.2;if(t>=803.2)pop(p23,t,803.2,1.3)}}
+};
+B.pillarsF=g=>B.pillars(g,'F');B.pillarsQ=g=>B.pillars(g,'Q');B.pillarsR=g=>B.pillars(g,'R');
+B.watersA=g=>B.waters(g,'A');B.watersB=g=>B.waters(g,'B');
+B.regionsAll=g=>B.regions(g,'all');B.regionsDesert=g=>B.regions(g,'desert');
+
+/* ---------- Moteur ---------- */
+let si=-1,audio=$('c')&&new Audio(),hasAudio=false,vt=0,playing=false,rate=1,dur=DUR_DEFAULT,cues=[],lastT=performance.now(),saveT=0;
+const A=audio;A.preload='auto';
+function initGL(){if(!window.THREE){$('msg').textContent='Three.js introuvable : placez three.min.js à côté de index.html (voir README).';return false}
+  R=new THREE.WebGLRenderer({canvas:$('c'),antialias:true});SCN=new THREE.Scene();SCN.background=new THREE.Color(0x0a1626);SCN.fog=new THREE.Fog(0x0a1626,18,38);CAM=new THREE.PerspectiveCamera(50,16/9,.1,100);
+  SCN.add(new THREE.HemisphereLight(0xcfe6ff,0x5a4a30,.9));const d=new THREE.DirectionalLight(0xffffff,.9);d.position.set(5,10,6);SCN.add(d);
+  const rs=()=>{const s=$('view');R.setSize(s.clientWidth,s.clientHeight,false);CAM.aspect=s.clientWidth/s.clientHeight;fit=clamp(16/9/CAM.aspect,1,2);CAM.setViewOffset(s.clientWidth,s.clientHeight,0,0,s.clientWidth,s.clientHeight)};new ResizeObserver(rs).observe($('view'));rs();return true}
+function dispose(o){o.traverse(n=>{if(n.geometry)n.geometry.dispose();if(n.material){if(n.material.map)n.material.map.dispose();n.material.dispose()}})}
+function setScene(i){if(grp){SCN.remove(grp);dispose(grp)}si=i;grp=new THREE.Group();SCN.add(grp);orbit=0;const s=SC[i];upd=B[s.b](grp)||(()=>{});camBase=CAM.position.clone()}
+const cur=()=>hasAudio?A.currentTime:vt;
+function seek(t){t=clamp(t,0,dur);if(hasAudio)A.currentTime=t;vt=t}
+function idxAt(t){let k=0;for(let i=0;i<SC.length;i++)if(SC[i].s<=t)k=i;return k}
+function togglePlay(){if(hasAudio){A.paused?A.play().catch(()=>{}):A.pause()}else{playing=!playing;if(playing&&vt>=dur-.1)vt=0}}
+const isPlaying=()=>hasAudio?!A.paused:playing;
+const fmt=s=>Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0');
+
+function frame(now){const dt=Math.min(.1,(now-lastT)/1000);lastT=now;
+  if(!hasAudio&&playing){vt+=dt*rate;if(vt>=dur){vt=dur;playing=false}}
+  const t=cur();
+  if(R){const k=idxAt(t);if(k!==si)setScene(k);if(upd)upd(t);
+    if(look&&camBase){const k=(1-.08*clamp((t-SC[si].s)/25))*fit;CAM.position.set(look.x+(camBase.x-look.x)*k+Math.sin(t*.15)*orbit,look.y+(camBase.y-look.y)*k,look.z+(camBase.z-look.z)*k)}if(look)CAM.lookAt(look);R.render(SCN,CAM)}
+  showSub(t);$('bar').value=Math.round(t/dur*1000);$('time').textContent=fmt(t)+' / '+fmt(dur);$('bPlay').textContent=isPlaying()?'⏸':'▶';
+  document.querySelectorAll('#parts button').forEach((b,i)=>b.classList.toggle('on',t>=PARTS[i][1]&&(i==PARTS.length-1||t<PARTS[i+1][1])));
+  if(now-saveT>2000){saveT=now;try{localStorage.setItem('cm_t',t.toFixed(1))}catch(e){}}
+  requestAnimationFrame(frame)}
+
+/* ---------- Sous-titres SRT ---------- */
+let subIdx=-1;
+function parseSrt(txt){const out=[];txt.replace(/\r/g,'').trim().split(/\n\s*\n/).forEach(b=>{const l=b.split('\n'),m=l[1]&&l[1].match(/(\d+):(\d+):(\d+)[,.](\d+)\s*-->\s*(\d+):(\d+):(\d+)[,.](\d+)/);
+  if(m){const f=(h,mi,s,ms)=>+h*3600+ +mi*60+ +s+ +ms/1000;out.push({n:+l[0],a:f(m[1],m[2],m[3],m[4]),b:f(m[5],m[6],m[7],m[8]),t:l.slice(2).join('\n')})}});return out}
+let wd=[],wi=-1;
+function showSub(t){let lo=0,hi=cues.length-1,f=-1;while(lo<=hi){const m=(lo+hi)>>1;if(cues[m].a<=t){f=m;lo=m+1}else hi=m-1}
+  const c=f>=0&&t<cues[f].b?f:-1;
+  if(c!==subIdx){subIdx=c;wi=-1;const el=$('sub');el.textContent='';wd=[];
+    if(c>=0){const cu=cues[c],ws=cu.t.replace(/\s+/g,' ').trim().split(' '),tot=ws.reduce((s,w)=>s+w.length+2,0),d=cu.b-cu.a;let acc=0;
+      const ln=document.createElement('span');ln.className='ln';
+      ws.forEach(w=>{const s=document.createElement('span');s.className='w';s.textContent=w;ln.appendChild(s);ln.appendChild(document.createTextNode(' '));wd.push({s,t:cu.a+d*acc/tot});acc+=w.length+2});el.appendChild(ln)}}
+  if(c>=0){let k=-1;for(let i=0;i<wd.length;i++)if(t>=wd[i].t)k=i;if(k!==wi){if(wd[wi])wd[wi].s.classList.remove('on');if(wd[k])wd[k].s.classList.add('on');wi=k}}}
+function setSrt(txt,src){cues=parseSrt(txt);subIdx=-2;$('srtState').textContent=cues.length?`SRT : ${cues.length} sous-titres (${src}).`:'SRT illisible : aucun sous-titre trouvé.';return cues.length}
+
+/* ---------- IndexedDB ---------- */
+const db=new Promise((ok,ko)=>{if(!window.indexedDB)return ko('IndexedDB indisponible');const r=indexedDB.open('cours-mauritanie',1);r.onupgradeneeded=()=>r.result.createObjectStore('f');r.onsuccess=()=>ok(r.result);r.onerror=()=>ko(r.error)});
+const tx=(mode,fn)=>db.then(d=>new Promise((ok,ko)=>{const t=d.transaction('f',mode),rq=fn(t.objectStore('f'));t.oncomplete=()=>ok(rq&&rq.result);t.onerror=t.onabort=()=>ko(t.error)}));
+const idbPut=(k,v)=>tx('readwrite',s=>s.put(v,k)),idbGet=k=>tx('readonly',s=>s.get(k)),idbDel=k=>tx('readwrite',s=>s.delete(k));
+
+/* ---------- Audio ---------- */
+let url=null;
+function useAudio(blob,name,saved){if(url)URL.revokeObjectURL(url);url=URL.createObjectURL(blob);A.src=url;A.playbackRate=rate;hasAudio=true;
+  A.onloadedmetadata=()=>{dur=A.duration||DUR_DEFAULT};$('audioState').textContent=`Audio : ${name}`+(saved?' — enregistré localement ✔':'');}
+async function importAudio(f){if(!f)return;const wasPlaying=isPlaying();A.pause();$('audioState').textContent=`Importation de ${f.name}…`;useAudio(f,f.name,false);
+  try{$('audioState').textContent=`Enregistrement local de ${f.name}…`;await idbPut('audio',{name:f.name,blob:f});useAudio(f,f.name,true);
+    if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{})}
+  catch(e){$('audioState').textContent=`Audio : ${f.name} — lu, mais NON enregistré (${e&&e.name==='QuotaExceededError'?'stockage plein':'échec de l’enregistrement'}). Il faudra le réimporter.`}
+  seek(0)}
+async function delAudio(){A.pause();A.removeAttribute('src');A.load();hasAudio=false;dur=DUR_DEFAULT;if(url)URL.revokeObjectURL(url);url=null;vt=0;try{await idbDel('audio')}catch(e){}$('audioState').textContent='Audio supprimé : mode manuel.'}
+
+/* ---------- Démarrage ---------- */
+function bind(){
+  $('parts').innerHTML='';PARTS.forEach(p=>{const b=document.createElement('button');b.textContent=p[0];b.onclick=()=>seek(p[1]);$('parts').appendChild(b)});
+  $('bPlay').onclick=togglePlay;$('bBack').onclick=()=>seek(cur()-5);$('bFwd').onclick=()=>seek(cur()+5);
+  $('bPrev').onclick=()=>{const k=idxAt(cur());seek(cur()-SC[k].s>2?SC[k].s:SC[Math.max(0,k-1)].s)};
+  $('bNext').onclick=()=>{const k=idxAt(cur());seek(SC[Math.min(SC.length-1,k+1)].s)};
+  $('bRestart').onclick=()=>seek(SC[idxAt(cur())].s);
+  $('bar').oninput=e=>seek(e.target.value/1000*dur);
+  $('rate').onchange=e=>{rate=+e.target.value;A.playbackRate=rate;try{localStorage.setItem('cm_rate',rate)}catch(x){}};
+  $('bSub').onclick=()=>{const o=$('sub').classList.toggle('off');$('bSub').textContent=o?'Sous-titres : non':'Sous-titres : oui'};
+  $('bFull').onclick=()=>document.fullscreenElement?document.exitFullscreen():$('stage').requestFullscreen&&$('stage').requestFullscreen();
+  $('fAudio').onchange=e=>{importAudio(e.target.files[0]);e.target.value=''};$('bDelAudio').onclick=delAudio;
+  $('fSrt').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;const tx2=await f.text();if(setSrt(tx2,f.name))try{await idbPut('srt',tx2)}catch(x){}};
+  addEventListener('keydown',e=>{if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT')return;if(e.code==='Space'){e.preventDefault();togglePlay()}if(e.code==='ArrowLeft')seek(cur()-5);if(e.code==='ArrowRight')seek(cur()+5)})}
+async function start(){bind();const gl=initGL();
+  try{const r=localStorage.getItem('cm_rate');if(r){rate=+r;$('rate').value=r}}catch(e){}
+  let srtDone=false;
+  try{const s=await idbGet('srt');if(s)srtDone=setSrt(s,'importé, enregistré dans le navigateur')>0}catch(e){}
+  if(!srtDone)setSrt(EMBEDDED_SRT,'intégré au fichier');
+  try{const a=await idbGet('audio');if(a&&a.blob)useAudio(a.blob,a.name,true)}catch(e){}
+  try{const t=+localStorage.getItem('cm_t');if(t>0)setTimeout(()=>seek(t),300)}catch(e){}
+  if(gl||true)requestAnimationFrame(frame)}
+start();
+
+</script>
+</body>
+</html>
